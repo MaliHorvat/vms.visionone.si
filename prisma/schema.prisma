@@ -1,0 +1,160 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model VmsLicensePlan {
+  id          String        @id @default(cuid())
+  code        String        @unique
+  name        String
+  cameraLimit Int
+  userLimit   Int           @default(3)
+  liveEnabled Boolean       @default(true)
+  playbackEnabled Boolean   @default(false)
+  alertsEnabled Boolean     @default(false)
+  cloudBackupEnabled Boolean @default(false)
+  monthlyPriceCents Int     @default(0)
+  description String        @default("")
+  customers   VmsCustomer[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model VmsCustomer {
+  id        String          @id @default(cuid())
+  slug      String          @unique
+  name      String
+  contact   String          @default("")
+  email     String          @default("")
+  phone     String          @default("")
+  planId    String
+  plan      VmsLicensePlan  @relation(fields: [planId], references: [id], onDelete: Restrict)
+  sites     VmsSite[]
+  users     VmsUser[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@index([planId])
+}
+
+model VmsSite {
+  id         String       @id @default(cuid())
+  customerId String
+  customer   VmsCustomer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  name       String
+  address    String       @default("")
+  nvrName    String       @default("")
+  nvrIp      String       @default("")
+  nvrModel   String       @default("")
+  cameras    VmsCamera[]
+  gateways   VmsGateway[]
+  claims     VmsGatewayClaim[]
+  checks     VmsGatewayCheck[]
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@index([customerId])
+}
+
+model VmsCamera {
+  id        String    @id @default(cuid())
+  siteId    String
+  site      VmsSite   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  name      String
+  channel   Int       @default(1)
+  ip        String    @default("")
+  model     String    @default("")
+  status    String    @default("unknown")
+  enabled   Boolean   @default(true)
+  lastSeenAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([siteId])
+  @@index([status])
+}
+
+model VmsGateway {
+  id          String            @id @default(cuid())
+  siteId      String
+  site        VmsSite           @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  externalId  String            @unique
+  name        String
+  status      String            @default("pending")
+  version     String            @default("")
+  localIp     String            @default("")
+  publicIp    String            @default("")
+  lastSeenAt  DateTime?
+  lastError   String            @default("")
+  tokenHash   String            @default("")
+  checks      VmsGatewayCheck[]
+  claims      VmsGatewayClaim[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([siteId])
+  @@index([status])
+}
+
+model VmsGatewayClaim {
+  id         String      @id @default(cuid())
+  code       String      @unique
+  siteId     String
+  site       VmsSite     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  gatewayId  String?
+  gateway    VmsGateway? @relation(fields: [gatewayId], references: [id], onDelete: SetNull)
+  externalId String
+  name       String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime    @default(now())
+
+  @@index([siteId])
+  @@index([expiresAt])
+}
+
+model VmsGatewayCheck {
+  id          String      @id @default(cuid())
+  gatewayId   String
+  gateway     VmsGateway  @relation(fields: [gatewayId], references: [id], onDelete: Cascade)
+  siteId      String
+  site        VmsSite     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  status      String
+  localIp     String      @default("")
+  uptimeSec   Int?
+  cameraCount Int         @default(0)
+  camerasOnline Int       @default(0)
+  nvrReachable Boolean    @default(false)
+  errorText    String     @default("")
+  checkedAt    DateTime
+  createdAt    DateTime   @default(now())
+
+  @@index([gatewayId, checkedAt])
+  @@index([siteId, checkedAt])
+}
+
+model VmsUser {
+  id          String       @id @default(cuid())
+  customerId  String
+  customer    VmsCustomer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  email       String       @unique
+  name        String       @default("")
+  passwordHash String      @db.Text
+  role        VmsUserRole  @default(viewer)
+  isActive    Boolean      @default(true)
+  lastLoginAt DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([customerId])
+}
+
+enum VmsUserRole {
+  owner
+  admin
+  viewer
+}
