@@ -1,11 +1,22 @@
 import Link from "next/link";
 import { Bell, Camera, Gauge, KeyRound, LogOut, Router, Search, Video } from "lucide-react";
 
-const nav = [
-  { href: "/dashboard", label: "Dashboard", icon: Gauge },
-  { href: "/cameras", label: "Kamere", icon: Camera },
-  { href: "/gateway", label: "Gateway", icon: Router },
-  { href: "/account", label: "Licenca", icon: KeyRound },
+const navSections = [
+  {
+    title: "PREGLED",
+    items: [{ href: "/dashboard", label: "Nadzorna plošča", icon: Gauge }],
+  },
+  {
+    title: "VIDEO",
+    items: [
+      { href: "/cameras", label: "Kamere", icon: Camera },
+      { href: "/gateway", label: "Gateway", icon: Router },
+    ],
+  },
+  {
+    title: "SISTEM",
+    items: [{ href: "/account", label: "Račun & licenca", icon: KeyRound }],
+  },
 ];
 
 export function VmsShell({
@@ -56,40 +67,55 @@ export function VmsShell({
               <span>VisionOne VMS</span>
             </Link>
           </div>
-          <nav style={{ display: "grid", gap: 4, padding: "14px 8px", flex: 1, overflowY: "auto" }}>
-            <div
-              style={{
-                padding: "0 12px 6px",
-                color: "var(--vo-muted)",
-                fontSize: 10,
-                fontWeight: 800,
-                letterSpacing: "0.11em",
-              }}
-            >
-              PREGLED
-            </div>
-            {nav.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
+          <nav
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 14,
+              padding: "14px 8px",
+              flex: 1,
+              overflowY: "auto",
+            }}
+          >
+            {navSections.map((section) => (
+              <div key={section.title}>
+                <div
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 9,
-                    padding: "8px 12px",
-                    borderRadius: 8,
+                    padding: "0 12px 6px",
                     color: "var(--vo-muted)",
-                    fontSize: 13,
-                    fontWeight: 650,
+                    fontSize: 10,
+                    fontWeight: 800,
+                    letterSpacing: "0.11em",
                   }}
                 >
-                  <Icon size={16} />
-                  {item.label}
-                </Link>
-              );
-            })}
+                  {section.title}
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                  {section.items.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 9,
+                          padding: "7px 12px",
+                          borderRadius: 7,
+                          color: "var(--vo-muted)",
+                          fontSize: 13,
+                          fontWeight: 650,
+                        }}
+                      >
+                        <Icon size={16} />
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </nav>
           <div style={{ borderTop: "1px solid var(--vo-border)", padding: 12 }}>
             <div
@@ -178,7 +204,7 @@ export function VmsShell({
               </form>
             </div>
           </header>
-          <main style={{ flex: 1, padding: 24, minWidth: 0, overflowY: "auto" }}>{children}</main>
+          <main style={{ flex: 1, padding: "18px 24px 24px", minWidth: 0, overflowY: "auto" }}>{children}</main>
         </div>
       </div>
     </div>
