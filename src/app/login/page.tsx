@@ -89,57 +89,57 @@ export default async function LoginPage({
           <p style={{ margin: "0 0 24px", color: "var(--vo-muted)", lineHeight: 1.5 }}>
             Vpišite email in geslo, ki ste ga prejeli ob aktivaciji VisionOne VMS licence.
           </p>
-        {params.error ? (
-          <div
-            style={{
-              border: "1px solid rgba(192,38,38,.25)",
-              background: "var(--vo-danger-muted)",
-              color: "var(--vo-danger)",
-              borderRadius: 10,
-              padding: 12,
-              marginBottom: 16,
-              fontSize: 14,
-            }}
-          >
-            {errorText}
-          </div>
-        ) : null}
-        <form action="/api/auth/login" method="post" style={{ display: "grid", gap: 14 }}>
-          <input type="hidden" name="next" value={params.next ?? "/dashboard"} />
-          <label style={{ display: "grid", gap: 6, fontSize: 13, fontWeight: 700 }}>
-            Email
-            <input
-              className="vo-input"
-              name="email"
-              type="email"
-              autoComplete="email"
-              placeholder="ime@podjetje.si"
-              required
-            />
-          </label>
-          <label style={{ display: "grid", gap: 6, fontSize: 13, fontWeight: 700 }}>
-            Geslo
-            <input
-              className="vo-input"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              placeholder="Vnesite geslo"
-              required
-            />
-          </label>
-          <button
-            className="vo-button-primary"
-            type="submit"
-            style={{
-              marginTop: 6,
-              padding: "13px 16px",
-              fontSize: 15,
-            }}
-          >
-            Vstop v VMS
-          </button>
-        </form>
+          {params.error ? (
+            <div
+              style={{
+                border: "1px solid rgba(192,38,38,.25)",
+                background: "var(--vo-danger-muted)",
+                color: "var(--vo-danger)",
+                borderRadius: 10,
+                padding: 12,
+                marginBottom: 16,
+                fontSize: 14,
+              }}
+            >
+              {errorText}
+            </div>
+          ) : null}
+          <form action="/api/auth/login" method="post" style={{ display: "grid", gap: 14 }}>
+            <input type="hidden" name="next" value={params.next ?? "/dashboard"} />
+            <label style={{ display: "grid", gap: 6, fontSize: 13, fontWeight: 700 }}>
+              Email
+              <input
+                className="vo-input"
+                name="email"
+                type="email"
+                autoComplete="email"
+                placeholder="ime@podjetje.si"
+                required
+              />
+            </label>
+            <label style={{ display: "grid", gap: 6, fontSize: 13, fontWeight: 700 }}>
+              Geslo
+              <input
+                className="vo-input"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                placeholder="Vnesite geslo"
+                required
+              />
+            </label>
+            <button
+              className="vo-button-primary"
+              type="submit"
+              style={{
+                marginTop: 6,
+                padding: "13px 16px",
+                fontSize: 15,
+              }}
+            >
+              Vstop v VMS
+            </button>
+          </form>
           <div
             style={{
               marginTop: 22,
