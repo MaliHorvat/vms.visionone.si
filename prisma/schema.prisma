@@ -50,6 +50,7 @@ model VmsSite {
   nvrName    String       @default("")
   nvrIp      String       @default("")
   nvrModel   String       @default("")
+  streamBaseUrl String    @default("")
   cameras    VmsCamera[]
   gateways   VmsGateway[]
   claims     VmsGatewayClaim[]
@@ -67,6 +68,7 @@ model VmsCamera {
   name      String
   channel   Int       @default(1)
   ip        String    @default("")
+  rtspUrl   String    @default("")
   model     String    @default("")
   status    String    @default("unknown")
   enabled   Boolean   @default(true)
