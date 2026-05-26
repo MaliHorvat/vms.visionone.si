@@ -1,0 +1,129 @@
+VisionOne VMS — Raspberry Pi Gateway
+=====================================
+Kratka navodila (SLO)
+
+Kaj je v ZIP-u
+--------------
+- .env                      nastavitve (claim koda, AUTO_DISCOVER)
+- visionone_vms_gateway.py  agent (scan mreže + status v oblak)
+- install.sh                namestitev + avtomatski zagon ob vklopu Pi-ja
+- README-SLO.txt            kratek opis
+- NAVODILA-Pi-SLO.txt       ta datoteka
+
+Predpogoji
+----------
+- Raspberry Pi z internetom (ethernet priporočeno)
+- Pi v isti mreži kot NVR in kamere
+- Claim koda ustvarjena v Portalu → VisionOne VMS → Prenesi gateway paket (ZIP)
+
+1) Kopiraj ZIP na Pi
+--------------------
+Na PC-ju razpakiraj ZIP, nato mapo kopiraj na Pi (USB, WinSCP ali scp).
+
+Primer (Windows PowerShell, zamenjaj IP):
+  scp -r "C:\pot\do\razpakiranega\zipa\*" visionone@192.168.1.24:~/visionone-gateway/
+
+2) Namestitev (enkrat)
+----------------------
+Na Pi-ju:
+
+  cd ~/visionone-gateway
+  sudo bash install.sh
+
+Kaj naredi install.sh:
+- kopira datoteke v /opt/visionone-vms-gateway/
+- ustvari systemd storitev visionone-vms-gateway
+- omogoči avtomatski zagon ob vklopu Pi-ja (enable)
+- takoj zažene agenta
+
+3) Preveri delovanje
+--------------------
+  sudo systemctl status visionone-vms-gateway
+  sudo journalctl -u visionone-vms-gateway -f
+
+Pričakuj v logu (po 1–2 min):
+  scanning local network…
+  discovered X devices
+  status sent online discovered=X cameras=Y nvr=192.168.x.x
+
+Izhod iz loga: Ctrl+C (storitev še naprej teče).
+
+4) Avtomatski zagon ob vklopu
+-----------------------------
+  sudo systemctl is-enabled visionone-vms-gateway
+
+Mora vrniti: enabled
+
+Po rebootu Pi-ja agent sam nastartira — ni treba nič ročno zagnati.
+
+5) Posodobitev (nov ZIP iz portala)
+-----------------------------------
+  cd ~/visionone-gateway
+  sudo bash install.sh
+
+install.sh ponovno kopira .env in skripto ter restarta storitev.
+
+Pomembno: nova claim koda je enkratna. Če je stara že porabljena,
+v portalu prenesi nov ZIP (ne briši gateway-state.json, razen če
+nameščaš popolnoma na novo).
+
+6) Ročni test (samo za diagnostiko)
+-----------------------------------
+  sudo systemctl stop visionone-vms-gateway
+  cd /opt/visionone-vms-gateway
+  set -a && source .env && set +a
+  python3 visionone_vms_gateway.py
+
+Po testu: Ctrl+C, nato:
+  sudo systemctl start visionone-vms-gateway
+
+7) Preveri verzijo agenta
+-------------------------
+  grep 'VERSION = ' /opt/visionone-vms-gateway/visionone_vms_gateway.py
+
+Pričakovano: VERSION = "0.2.0"
+
+8) .env — kaj mora biti
+-----------------------
+  VMS_API_BASE=https://vms.visionone.si
+  VMS_CLAIM_CODE=VMS-....-.....
+  GATEWAY_NAME=...
+  AUTO_DISCOVER=1
+  SCAN_INTERVAL_SECONDS=300
+  CHECK_INTERVAL_SECONDS=30
+  NVR_IP=
+  CAMERA_TARGETS=
+
+IP-jev kamer in NVR-ja NI treba ročno vnašati — Pi jih najde sam.
+
+9) Kje preveriš rezultat
+------------------------
+- Portal → VisionOne VMS → status gatewaya, NVR IP, kamere
+- vms.visionone.si → Gateway / Kamere (stranka)
+
+10) Pogoste težave
+------------------
+- status failed / 401 → claim koda porabljena → nov ZIP iz portala
+- discovered 0 devices → Pi ni v isti mreči ali firewall
+- samo systemd log, brez Python izpisa → počakaj 1–2 min ali ročni test (točka 6)
+- stara verzija 0.1.0 → ponovno prenesi ZIP iz portala in install.sh
+
+Uporabne ukaze
+--------------
+  sudo systemctl restart visionone-vms-gateway
+  sudo systemctl stop visionone-vms-gateway
+  sudo systemctl start visionone-vms-gateway
+  sudo nano /opt/visionone-vms-gateway/.env
+
+Podpora: VisionOne
+
+11) Live view (faza 1)
+----------------------
+- install.sh avtomatsko namesti tudi go2rtc (port 1984 lokalno)
+- Admin v portalu nastavi Stream URL = javni go2rtc tunel (npr. Cloudflare Tunnel)
+- RTSP URL kamere je opcijski (privzeto iz NVR kanala)
+- Stranka na vms.visionone.si → Kamere → Live
+
+Lokalni test go2rtc:
+  curl http://127.0.0.1:1984/api/streams
+  sudo systemctl status visionone-go2rtc
