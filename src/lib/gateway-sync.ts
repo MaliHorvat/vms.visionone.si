@@ -100,7 +100,7 @@ export async function syncGatewaySiteTelemetry(
         name: `Kamera ${channel}`,
       };
 
-      let camera =
+      const camera =
         siteCameras.find((row) => row.id === matchedIncoming.id) ??
         siteCameras.find((row) => row.channel === channel) ??
         siteCameras.find((row) => row.ip === discoveredDevice.ip);
