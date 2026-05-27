@@ -29,3 +29,36 @@ export function resolveRtspUrl(input: { rtspUrl: string; ip: string; channel: nu
 export function isLiveConfigured(streamBaseUrl: string, rtspUrl: string) {
   return Boolean(streamBaseUrl.trim() && rtspUrl.trim());
 }
+
+export type LiveCameraInput = {
+  id: string;
+  name: string;
+  channel: number;
+  ip: string;
+  rtspUrl: string;
+  status: string;
+};
+
+export type LiveSiteInput = {
+  id: string;
+  name: string;
+  nvrIp: string;
+  streamBaseUrl: string;
+};
+
+export function buildCameraLiveSession(camera: LiveCameraInput, site: LiveSiteInput) {
+  const streamName = cameraStreamName(camera.channel);
+  const rtspUrl = resolveRtspUrl(
+    { rtspUrl: camera.rtspUrl, ip: camera.ip, channel: camera.channel },
+    site.nvrIp,
+  );
+  const streamBaseUrl = site.streamBaseUrl.trim();
+  if (!isLiveConfigured(streamBaseUrl, rtspUrl)) return null;
+  return {
+    camera: { id: camera.id, name: camera.name, channel: camera.channel, status: camera.status },
+    site: { id: site.id, name: site.name },
+    streamName,
+    rtspUrl,
+    playerUrl: buildGo2rtcPlayerUrl(streamBaseUrl, streamName),
+  };
+}

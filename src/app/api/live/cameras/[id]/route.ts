@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { buildGo2rtcPlayerUrl, cameraStreamName, isLiveConfigured, resolveRtspUrl } from "@/lib/live-stream";
+import { buildCameraLiveSession } from "@/lib/live-stream";
 import { getSession } from "@/lib/session";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -29,32 +29,32 @@ export async function GET(_request: Request, ctx: Ctx) {
     return NextResponse.json({ error: "Live view ni vključen v licenco." }, { status: 403 });
   }
 
-  const streamName = cameraStreamName(camera.channel);
-  const rtspUrl = resolveRtspUrl(
-    { rtspUrl: camera.rtspUrl, ip: camera.ip, channel: camera.channel },
-    camera.site.nvrIp,
+  const sessionData = buildCameraLiveSession(
+    {
+      id: camera.id,
+      name: camera.name,
+      channel: camera.channel,
+      ip: camera.ip,
+      rtspUrl: camera.rtspUrl,
+      status: camera.status,
+    },
+    {
+      id: camera.site.id,
+      name: camera.site.name,
+      nvrIp: camera.site.nvrIp,
+      streamBaseUrl: camera.site.streamBaseUrl,
+    },
   );
-  const streamBaseUrl = camera.site.streamBaseUrl.trim();
 
-  if (!isLiveConfigured(streamBaseUrl, rtspUrl)) {
+  if (!sessionData) {
     return NextResponse.json(
       {
         error: "Live view še ni konfiguriran za ta objekt.",
-        hint: "Admin mora nastaviti Stream URL (go2rtc tunel) in preveriti RTSP vir kamere.",
-        rtspUrl,
-        streamBaseUrl,
-        streamName,
+        hint: "Admin mora v portalu nastaviti Stream URL in RTSP URL kamere.",
       },
       { status: 503 },
     );
   }
 
-  return NextResponse.json({
-    ok: true,
-    camera: { id: camera.id, name: camera.name, channel: camera.channel, status: camera.status },
-    site: { id: camera.site.id, name: camera.site.name },
-    streamName,
-    rtspUrl,
-    playerUrl: buildGo2rtcPlayerUrl(streamBaseUrl, streamName),
-  });
+  return NextResponse.json({ ok: true, ...sessionData });
 }
