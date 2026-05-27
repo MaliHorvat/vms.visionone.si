@@ -16,8 +16,9 @@ export function resolveRtspUrl(input: { rtspUrl: string; ip: string; channel: nu
   const explicit = input.rtspUrl.trim();
   if (explicit) return explicit;
   if (nvrIp.trim() && input.channel > 0) {
+    // Hikvision-style: kanal 1 main = 101, kanal 2 main = 201, …
     const code = input.channel * 100 + 1;
-    return `rtsp://${nvrIp.trim()}:554/Streaming/Channels/${code}01`;
+    return `rtsp://${nvrIp.trim()}:554/Streaming/Channels/${code}`;
   }
   if (input.ip.trim()) {
     return `rtsp://${input.ip.trim()}:554/`;
