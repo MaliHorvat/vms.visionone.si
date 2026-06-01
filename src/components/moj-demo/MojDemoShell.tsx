@@ -36,11 +36,11 @@ export function MojDemoShell({ children }: { children: React.ReactNode }) {
           color: "#92400e",
         }}
       >
-        Predogled portala za stranke — dejanski dostop bo na{" "}
+        Predogled portala za stranke (posodobljeno) — dejanski dostop:{" "}
         <a href="https://moj.visionone.si" style={{ color: "var(--vo-accent)", textDecoration: "underline" }}>
           moj.visionone.si
         </a>
-        . Brez live videonadzora in RTSP.
+        . Brez live videonadzora in RTSP. Če še vidite kamere/RTSP, osvežite stran (Ctrl+F5) ali počakajte na Vercel deploy.
       </div>
 
       <header
