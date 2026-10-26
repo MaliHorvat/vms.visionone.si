@@ -1,0 +1,74 @@
+# VisionOne VMS (Admin + View), AI modul in oddaljen dostop vms.visionone.si
+# Zagon:                    docker compose up -d --build
+# Z oddaljenim dostopom:    docker compose --profile tunel up -d --build   (TUNNEL_TOKEN v .env)
+# Z AI modulom:             dodajte --profile ai
+
+name: visionone
+
+services:
+  go2rtc:
+    image: alexxit/go2rtc:latest
+    container_name: visionone-go2rtc
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ:-Europe/Ljubljana}
+      - HOST_IP=${HOST_IP:-127.0.0.1}
+    volumes:
+      - ./go2rtc:/config:ro
+    ports:
+      # RTSP restream za Home Assistant ali drug sistem. Ni zaščiten z geslom, zato ga odprite le v zaupanja vrednem omrežju:
+      # - "8554:8554"
+      - "8555:8555/tcp"      # WebRTC (dvosmerni zvok v lokalnem omrežju)
+      - "8555:8555/udp"
+
+  vms:
+    build: ./vms
+    image: visionone/vms:1.1
+    container_name: visionone-vms
+    restart: unless-stopped
+    depends_on: [go2rtc]
+    environment:
+      - TZ=${TZ:-Europe/Ljubljana}
+      - ADMIN_USER=${ADMIN_USER:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-VisionOne123!}
+      - SECRET_KEY=${SECRET_KEY:-}
+      - AI_TOKEN=${AI_TOKEN:-zamenjajte-ta-zeton-v-env}
+      - GO2RTC_API=http://go2rtc:1984
+      - GO2RTC_RTSP=rtsp://go2rtc:8554
+      - DEMO_CAMERAS=${DEMO_CAMERAS:-0}
+      - SYSTEM_NAME=${SYSTEM_NAME:-VisionOne}
+      - SEGMENT_SECONDS=60
+    volumes:
+      - ./data/vms:/data
+      # Diski za posnetke. Glavni disk:
+      - ${RECORDINGS_PATH:-./recordings}:/recordings
+      # Dodatne diske priklopite kot podmape /recordings in jih dodajte v Admin → Snemanje in diski, npr.:
+      # - D:/VisionOne/disk2:/recordings/disk2
+    ports:
+      - "${VMS_PORT:-8080}:8080"
+
+  # Oddaljen dostop: https://vms.visionone.si → VisionOne View (Cloudflare Tunnel, brez odpiranja vrat na usmerjevalniku)
+  tunel:
+    image: cloudflare/cloudflared:latest
+    container_name: visionone-tunel
+    restart: unless-stopped
+    profiles: ["tunel"]
+    depends_on: [vms]
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN:-}
+
+  ai:
+    build: ./ai
+    image: visionone/ai:1.0
+    container_name: visionone-ai
+    restart: unless-stopped
+    profiles: ["ai"]
+    depends_on: [vms]
+    environment:
+      - TZ=${TZ:-Europe/Ljubljana}
+      - VMS_URL=http://vms:8080
+      - AI_TOKEN=${AI_TOKEN:-zamenjajte-ta-zeton-v-env}
+      - GO2RTC_RTSP=rtsp://go2rtc:8554
+      - MODEL=${AI_MODEL:-yolo11n.pt}
+      - DEVICE=cpu

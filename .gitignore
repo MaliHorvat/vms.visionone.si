@@ -1,7 +1,5 @@
-.next
-node_modules
 .env
-.env.local
-dist
-coverage
-tsconfig.tsbuildinfo
+data/
+recordings/
+*.log
+node_modules/

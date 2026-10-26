@@ -1,0 +1,10 @@
+{
+  "name": "visionone-vms",
+  "version": "1.0.0",
+  "description": "VisionOne – sistem za videonadzor (VMS)",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": { "start": "node --no-warnings src/index.js" },
+  "engines": { "node": ">=22.13" },
+  "license": "UNLICENSED"
+}

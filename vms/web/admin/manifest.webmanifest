@@ -1,0 +1,2 @@
+{ "name": "VisionOne Admin", "short_name": "V1 Admin", "start_url": "/admin/", "display": "standalone", "background_color": "#12171d", "theme_color": "#12171d",
+  "icons": [{ "src": "/common/favicon.svg", "sizes": "any", "type": "image/svg+xml" }] }
