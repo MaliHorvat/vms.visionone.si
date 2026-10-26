@@ -108,6 +108,7 @@ VMS mora teči pri vas (v istem omrežju kot kamere). Domena vms.visionone.si do
 2. Kopirajte **žeton** tunela (niz za `--token`) v `.env` kot `TUNNEL_TOKEN=…`.
 3. V tunelu dodajte **Public Hostname**: poddomena `vms`, domena `visionone.si`, storitev `HTTP` → `vms:8080`.
    Če za `vms.visionone.si` že obstaja DNS zapis (npr. na Vercel), ga najprej izbrišite in domeno odstranite iz projekta na Vercelu.
+   Ta repozitorij se na Vercelu ne objavlja (`vercel.json` → `git.deploymentEnabled: false`) – VMS teče samo v Dockerju.
 4. Zaženite `zagon.bat` (ali `docker compose --profile tunel up -d --build`). Odprite https://vms.visionone.si.
 
 Priporočila: vklopite **dvofaktorsko prijavo** za vse uporabnike (Admin → Sistem → Moj račun). Za dodatno zaščito lahko v Cloudflare Zero Trust dodate še **Access** pravilo (npr. potrditev po e-pošti).
