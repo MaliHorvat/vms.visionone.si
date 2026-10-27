@@ -5,7 +5,7 @@
     "api/**/*.js": { "maxDuration": 30 }
   },
   "crons": [
-    { "path": "/api/cron/check", "schedule": "* * * * *" },
+    { "path": "/api/cron/check", "schedule": "0 6 * * *" },
     { "path": "/api/cron/licenses", "schedule": "0 7 * * *" }
   ],
   "headers": [

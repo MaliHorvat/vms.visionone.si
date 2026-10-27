@@ -4,6 +4,7 @@
 const { methods, readBody, ok, bad, clientIp } = require('../../lib/http');
 const db = require('../../lib/db');
 const agentauth = require('../../lib/agentauth');
+const reconcile = require('../../lib/reconcile');
 
 module.exports = methods({
   POST: async (req, res) => {
@@ -53,6 +54,13 @@ module.exports = methods({
         `INSERT INTO settings (k, v) VALUES (:k, :v) ON DUPLICATE KEY UPDATE v=VALUES(v)`,
         { k: `discovered:${loc.id}`, v: JSON.stringify({ ts: Date.now(), items: b.discovered.slice(0, 200) }) });
     }
+    // Sprotno zaznavanje izpadov (brez odvisnosti od Vercel crona):
+    // - incidenti naprav za to lokacijo takoj,
+    // - pregled agentov po vseh lokacijah največ enkrat na ~55 s.
+    try { await reconcile.reconcileLocation(loc.id); } catch (e) { console.error('[reconcile]', e.message); }
+    try { await reconcile.sendPending(); } catch (e) {}
+    reconcile.sweepIfDue().catch(() => {});
+
     return ok(res, { processed });
   },
 });

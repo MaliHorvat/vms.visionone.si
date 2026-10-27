@@ -59,8 +59,15 @@ curl -X POST https://vms.visionone.si/api/setup \
 Nato se prijavi na `https://vms.visionone.si`, **spremeni geslo** in **vklopi 2FA**
 (Moj račun). Po namestitvi lahko `SETUP_TOKEN` odstraniš.
 
-> Cron (nadzor izpadov vsako minuto, opomniki licenc) se zažene samodejno prek
-> `vercel.json`. Za dodatno zaščito nastavi `CRON_SECRET` (Vercel ga doda v klic).
+> **Zaznavanje izpadov** teče sproti ob vsakem agentovem poročilu (~45 s), zato
+> deluje tudi na **brezplačnem (Hobby)** planu Vercela, ki dovoli le dnevne crone.
+> Vercel crona sta zato dnevna (varovalni pregled + opomniki licenc).
+>
+> Če želiš minutno zaznavo tudi takrat, ko agent povsem odpove (ne pošilja nič),
+> nastavi `CRON_SECRET` in naj zunanji brezplačni razporejevalnik (npr. cron-job.org,
+> UptimeRobot) vsako minuto kliče:
+> `GET https://vms.visionone.si/api/cron/check` z glavo `Authorization: Bearer <CRON_SECRET>`.
+> Na planu **Pro** lahko namesto tega v `vercel.json` cron `check` nastaviš na `* * * * *`.
 
 ---
 

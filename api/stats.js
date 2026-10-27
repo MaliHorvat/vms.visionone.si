@@ -3,10 +3,13 @@
 const { methods, ok } = require('../lib/http');
 const db = require('../lib/db');
 const { requireAuth, isStaff } = require('../lib/auth');
+const reconcile = require('../lib/reconcile');
 
 module.exports = methods({
   GET: async (req, res) => {
     const u = await requireAuth(req, res); if (!u) return;
+    // ob ogledu nadzorne plošče osveži zaznavo agentov brez stika (debounce ~55 s)
+    reconcile.sweepIfDue().catch(() => {});
     const staff = isStaff(u);
     const cond = staff ? '1=1' : 'l.customer_id = :cid';
     const p = staff ? {} : { cid: u.customer_id };
