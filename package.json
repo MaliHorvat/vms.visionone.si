@@ -1,0 +1,15 @@
+{
+  "name": "visionone-portal",
+  "version": "1.0.0",
+  "description": "VisionOne nadzorni portal – administrativna platforma za nadzor omrežne infrastrukture na več lokacijah",
+  "private": true,
+  "license": "UNLICENSED",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node --test test/api.test.js",
+    "keygen": "node scripts/keygen.js"
+  },
+  "dependencies": {
+    "mysql2": "^3.11.0"
+  }
+}

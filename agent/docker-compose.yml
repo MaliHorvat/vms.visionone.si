@@ -1,0 +1,19 @@
+services:
+  visionone-agent:
+    build: .
+    image: visionone-agent:1.0.0
+    container_name: visionone-agent
+    restart: unless-stopped
+    # host omrežje: agent vidi celotno lokalno omrežje (ping, odkrivanje, SNMP)
+    network_mode: host
+    environment:
+      VO_PORTAL: https://vms.visionone.si
+      VO_TOKEN: ${VO_TOKEN}
+      TZ: ${TZ:-Europe/Ljubljana}
+    volumes:
+      # za nadzor Docker vsebnikov na gostitelju (samo branje)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # za lokalne poverilnice naprav in dejanja (neobvezno)
+      - ./config.json:/config.json:ro
+    # če uporabljaš config.json, nastavi pot:
+    # environment VO_CONFIG: /config.json

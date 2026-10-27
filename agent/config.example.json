@@ -1,0 +1,60 @@
+{
+  "portal_url": "https://vms.visionone.si",
+  "token": "SEM-PRILEPI-ŽETON-LOKACIJE",
+  "interval_sec": 45,
+  "discover_every": 20,
+  "insecure_tls": false,
+  "log_file": "",
+  "docker_socket": "/var/run/docker.sock",
+
+  "_pojasnilo": "Spodaj so LOKALNE poverilnice naprav in dovoljena dejanja. Portal jih NIKOLI ne prejme. 'device_id' je ID naprave iz portala (lahko tudi 'ip').",
+
+  "devices": [
+    {
+      "device_id": 10,
+      "ip": "192.168.1.64",
+      "username": "admin",
+      "password": "geslo-kamere",
+      "_opomba": "poverilnice za branje modela/firmware (ONVIF/ISAPI) kamere ali snemalnika"
+    },
+    {
+      "device_id": 20,
+      "ip": "192.168.1.70",
+      "actions": [
+        { "name": "open_door", "type": "hikvision", "username": "admin", "password": "geslo", "channel": 1 }
+      ]
+    },
+    {
+      "device_id": 21,
+      "ip": "192.168.1.71",
+      "actions": [
+        { "name": "open_door", "type": "dahua", "username": "admin", "password": "geslo", "channel": 1 }
+      ]
+    },
+    {
+      "device_id": 22,
+      "actions": [
+        { "name": "open_door", "type": "2n", "username": "admin", "password": "geslo", "url": "", "channel": 1 }
+      ]
+    },
+    {
+      "device_id": 23,
+      "actions": [
+        { "name": "open_door", "type": "shelly", "url": "http://192.168.1.80/relay/0?turn=on" },
+        { "name": "relay_off", "type": "shelly", "url": "http://192.168.1.80/relay/0?turn=off" }
+      ]
+    },
+    {
+      "device_id": 24,
+      "actions": [
+        { "name": "open_door", "type": "ha", "url": "http://192.168.1.90:8123", "token": "HA-DOLGOZIVI-ZETON", "entity": "switch.vrata" }
+      ]
+    },
+    {
+      "device_id": 30,
+      "ip": "127.0.0.1",
+      "extra": { "local": "1", "docker": "1", "disk": "/" },
+      "_opomba": "sam strežnik: CPU/RAM/disk + Docker vsebniki"
+    }
+  ]
+}

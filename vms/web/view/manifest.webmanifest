@@ -1,2 +1,0 @@
-{ "name": "VisionOne View", "short_name": "VisionOne", "start_url": "/view/", "display": "standalone", "background_color": "#12171d", "theme_color": "#12171d",
-  "icons": [{ "src": "/common/favicon.svg", "sizes": "any", "type": "image/svg+xml" }] }

@@ -1,160 +1,145 @@
-# VisionOne VMS — vms.visionone.si
+# VisionOne — nadzorni portal
 
-Sistem za videonadzor (VMS), ki teče v Docker Desktop pri vas, od zunaj pa je dosegljiv na **https://vms.visionone.si** prek Cloudflare Tunnela.
-Aplikacija za serviserja (VisionOne Field) je na https://portal.visionone.si.
+Administrativna platforma za nadzor omrežne infrastrukture na več lokacijah:
+seznam in nastavitve naprav, spremljanje delovanja in izpadov, Telegram
+obvestila in ukazi, daljinsko sprožanje domofona/releja ter **licenciranje po
+lokaciji**. Drugi del je **agent**, ki teče pri stranki in pošilja podatke na
+portal.
 
-| Aplikacija | Naslov | Za koga |
-|---|---|---|
-| **VisionOne Admin** | http://localhost:8080/admin/ | Skrbnik: kamere, snemalniki, diski, pravila, uporabniki |
-| **VisionOne View** | http://localhost:8080/view/ | Operater: živa slika, PTZ, predvajanje, alarmi, pametno iskanje |
-| **Od zunaj** | https://vms.visionone.si/ | View in Admin prek Cloudflare Tunnela |
-| VisionOne AI (neobvezno) | – | Zaznavanje oseb in vozil, območja, linije, sabotaža |
+- **Portal:** Node (Vercel Functions) + vanilla JS, domena `vms.visionone.si`.
+- **Baza:** MySQL/MariaDB (Neoserv).
+- **Agent:** ena izvršljiva datoteka (Go) — Windows storitev ali Docker.
 
-Pametno hišo upravlja Home Assistant. VisionOne mu pošilja dogodke prek MQTT (senzorji se v HA dodajo samodejno).
+```
+┌────────────┐   HTTPS (agent kliče ven)   ┌───────────────────────┐
+│  Agent @   │ ─────────────────────────▶  │  Portal (Vercel)      │
+│  stranka   │  telemetrija / ukazi        │  vms.visionone.si     │
+└────────────┘ ◀─────────────────────────  │  + MySQL (Neoserv)    │
+   kamere, switchi, UPS,                    │  + Telegram bot       │
+   strežnik, domofon                        └───────────────────────┘
+```
+
+Pri stranki **ni treba odpirati nobenih vrat** — agent vzpostavi povezavo navzven.
 
 ---
 
-## 1. Zagon
+## 1. Namestitev portala (Vercel + Neoserv)
 
-Potrebujete [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows, macOS ali Linux).
+### a) Baza na Neoservu
+V nadzorni plošči gostovanja ustvari MySQL bazo in uporabnika ter **dovoli
+oddaljeni dostop** (Remote MySQL). Zabeleži: host, port (3306), ime baze,
+uporabnika in geslo.
 
-1. Razširite mapo `visionone` na disk strežnika, npr. `C:\VisionOne`.
-2. Kopirajte `.env.example` v `.env` in v njej nastavite:
-   - `ADMIN_PASSWORD` – začetno geslo,
-   - `AI_TOKEN` – dolg naključen niz (skupen VMS-ju in AI modulu),
-   - `HOST_IP` – IP naslov računalnika v lokalnem omrežju,
-   - `RECORDINGS_PATH` – mapa za posnetke, npr. `D:/VisionOne/posnetki`.
-3. Zaženite:
-   - Windows: dvoklik na `zagon.bat`
-   - ali v terminalu: `docker compose up -d --build`
-   - z AI modulom: `docker compose --profile ai up -d --build`
-
-Prva gradnja traja nekaj minut (AI modul do 15 minut, prenese ~1,5 GB).
-
-4. Odprite http://localhost:8080/admin/ in se prijavite (uporabnik `admin`, geslo iz `.env`). **Geslo takoj spremenite** v Sistem → Moj račun in vklopite dvofaktorsko prijavo.
-
-Za preizkus brez kamer nastavite `DEMO_CAMERAS=2` – ob prvem zagonu se dodata dve testni kameri, ki snemata na strežnik.
-
-### Posodobitev in zaustavitev
-
+### b) Skrivnosti
+Lokalno zaženi (potrebuješ Node 20+):
 ```
-docker compose up -d --build     # po zamenjavi datotek z novo različico
-docker compose down              # zaustavitev (podatki ostanejo v mapah data/ in posnetki)
-docker compose logs -f vms       # dnevnik strežnika
+npm install
+node scripts/keygen.js
 ```
+Izpiše `SESSION_SECRET`, `SETUP_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`,
+`DEVICE_SECRET_KEY` ter licenčni par `LICENSE_PRIVATE_KEY` / `LICENSE_PUBLIC_KEY`.
+**Javni licenčni ključ** shrani tudi za agente (ga vgradiš ob izdaji licence).
+
+### c) Vercel
+1. Poveži GitHub repo `vms.visionone.si` z Vercel projektom.
+2. V **Settings → Environment Variables** vnesi vse iz `.env.example`
+   (baza, skrivnosti, `TELEGRAM_BOT_TOKEN`, `PORTAL_URL=https://vms.visionone.si`).
+3. Dodaj domeno `vms.visionone.si` (Vercel → Domains) in pri Neoserv/registrarju
+   nastavi DNS (CNAME na Vercel, kot ti pokaže Vercel).
+4. Objavi (Deploy). Samodejne objave so izklopljene (`vercel.json`) — objaviš ročno
+   ali vklopiš po želji.
+
+### d) Prvi zagon (ustvari tabele + skrbnika)
+Enkratni klic (zamenjaj vrednosti):
+```
+curl -X POST https://vms.visionone.si/api/setup \
+  -H "Content-Type: application/json" \
+  -d '{"token":"<SETUP_TOKEN>","username":"admin","password":"<mocno-geslo>"}'
+```
+Nato se prijavi na `https://vms.visionone.si`, **spremeni geslo** in **vklopi 2FA**
+(Moj račun). Po namestitvi lahko `SETUP_TOKEN` odstraniš.
+
+> Cron (nadzor izpadov vsako minuto, opomniki licenc) se zažene samodejno prek
+> `vercel.json`. Za dodatno zaščito nastavi `CRON_SECRET` (Vercel ga doda v klic).
 
 ---
 
-## 2. VisionOne Admin
+## 2. Telegram bot
 
-**Dodajanje snemalnika (NVR/DVR) z vsemi kamerami** – Snemalniki → Dodaj snemalnik. Vpišete IP, uporabnika in geslo; VisionOne samodejno prepozna proizvajalca, prebere vse kanale z imeni in stanjem, diske snemalnika ter jih uvozi kot kamere.
+1. Pri `@BotFather` ustvari bota → dobiš `TELEGRAM_BOT_TOKEN` (v Vercel ENV).
+   Zabeleži tudi uporabniško ime bota v `TELEGRAM_BOT_USERNAME`.
+2. Registriraj webhook (enkrat):
+   ```
+   curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://vms.visionone.si/api/telegram&secret_token=<TELEGRAM_WEBHOOK_SECRET>"
+   ```
+3. V portalu → **Moj račun → Telegram** dobiš kodo; v botu pošlji `/povezi KODA`.
+4. Ukazi: `/status`, `/lokacije`, `/izpadi`, `/odpri` (gumbi za domofone/releje).
 
-| Proizvajalec | Uvoz kanalov | Imena kamer | Stanje diskov | Predvajanje s snemalnika | Časovnica posnetkov | PTZ |
-|---|---|---|---|---|---|---|
-| Hikvision / HiLook / HiWatch (ISAPI) | da | da | da | da | da | da |
-| Dahua / Imou / Lorex (CGI) | da | da | da | da | – | da |
-| Uniview | da (ONVIF) | da | – | da | – | ONVIF |
-| Drugi (ONVIF) | da | da | – | – | – | ONVIF |
-| Ročna predloga RTSP | da | – | – | – | – | – |
-
-**Kje se snema – za vsako kamero posebej** (Kamere → Uredi → Snemanje):
-- **Na snemalnik** – NVR snema kot doslej, VisionOne posnetke predvaja z njega.
-- **Na strežnik** – VisionOne snema na diske v strežniku (1-minutne MP4 datoteke).
-- **Oboje** – dvojna varnost.
-- **Ne snemaj** – samo živa slika.
-
-Načini snemanja: stalno, ob dogodku (s pred- in po-snemanjem) ali po tedenskem urniku. Rok hrambe se nastavi po kameri; ko je disk poln, se brišejo najstarejši nezaklenjeni posnetki.
-
-**Več diskov v strežniku**: v `docker-compose.yml` dodajte vrstico, npr. `- E:/VisionOne/disk2:/recordings/disk2`, ponovno zaženite in disk dodajte v Snemanje in diski. Za vsak disk lahko nastavite kvoto in najmanjši prosti prostor.
-
-**Iskanje naprav** – vpišite območje lokalnega omrežja (npr. `192.168.1.0/24`). Docker Desktop na Windows/macOS ne prepušča ONVIF multicasta, zato VisionOne vsak naslov preveri posebej (ONVIF unicast + vrata 80, 554, 8000, 37777).
-
-Ostalo: skupine kamer, tlorisi z razporeditvijo kamer, pravila in alarmi (resnost, pojavno okno, zvok, push obvestila ntfy, webhook, MQTT, zaklep posnetka, premik PTZ), uporabniki z vlogami in dostopom do posameznih kamer, revizijska sled (GDPR), API žetoni, varnostna kopija nastavitev.
-
-## 3. VisionOne View
-
-- mreže 1, 4, 6, 9, 12, 16, 25, 36; povleci in spusti; shranjeni in skupni pogledi; samodejno kroženje
-- dvoklik poveča kamero (glavni tok), v mreži se uporablja podtok
-- digitalni zoom (kolešček), posnetek zaslona, takojšnje predvajanje zadnjih 30 s
-- PTZ z hitrostjo in prednastavljenimi položaji, ročni alarm, zvok, dvosmerni zvok (potrebuje HTTPS in WebRTC)
-- predvajanje do 4 kamer sinhrono, časovnica s posnetki strežnika in snemalnika ter dogodki, hitrost do 16×, skok na dogodke
-- izvoz MP4 z vodnim žigom in kontrolno vsoto SHA-256, zaznamki in zaklepanje posnetkov
-- dogodki v živo, potrjevanje alarmov s komentarjem, pojavna okna
-- **pametno iskanje** v slovenščini: »oseba včeraj med 14 in 16«, »rdeč avto ponoči«, »oseba dvorišče«
-- statistika (osebe, vozila, štetje na linijah), tloris s kamerami
-
-## 4. Pametne funkcije (AI modul)
-
-Zaženite z `docker compose --profile ai up -d --build`, nato pri kameri vklopite **Pametne funkcije**:
-- zaznava oseb, vozil, koles, živali (model YOLO, deluje na procesorju)
-- vstop v območje, prečkanje linije s smerjo (štetje noter/ven), zadrževanje v območju
-- prevladujoča barva (za iskanje »rdeč avto«)
-- sabotaža: prekrita, zamegljena ali premaknjena kamera
-- sličica z označenim objektom pri vsakem dogodku
-
-Obremenitev: približno 1 procesorsko jedro za 4–6 kamer pri 2 analizah na sekundo. Brez AI modula VisionOne še vedno sprejema dogodke kamer prek ONVIF (gibanje, linija, vdor, sabotaža).
-
-## 5. Home Assistant
-
-Admin → Integracije → MQTT: vpišite IP Home Assistanta (Mosquitto dodatek), uporabnika in geslo. Za vsako kamero se v HA pojavijo senzorji *gibanje, oseba, vozilo, povezava, sabotaža* in *zadnji dogodek*. Teme: `visionone/events`, `visionone/camera/<id>/...`.
-
-Sliko kamere v HA dobite z naslovom `http://<strežnik>:8080/api/cameras/<id>/snapshot` in API žetonom ali z RTSP restreamom (odkomentirajte vrata 8554 v `docker-compose.yml`).
-
-## 6. Oddaljen dostop – vms.visionone.si
-
-VMS mora teči pri vas (v istem omrežju kot kamere). Domena vms.visionone.si do njega vodi prek **Cloudflare Tunnela**: na usmerjevalniku ni treba odpirati vrat, povezava je HTTPS.
-
-1. Cloudflare → **Zero Trust → Networks → Tunnels → Create a tunnel** (vrsta *Cloudflared*), ime npr. `visionone-vms`.
-2. Kopirajte **žeton** tunela (niz za `--token`) v `.env` kot `TUNNEL_TOKEN=…`.
-3. V tunelu dodajte **Public Hostname**: poddomena `vms`, domena `visionone.si`, storitev `HTTP` → `vms:8080`.
-   Če za `vms.visionone.si` že obstaja DNS zapis (npr. na Vercel), ga najprej izbrišite in domeno odstranite iz projekta na Vercelu.
-   Ta repozitorij se na Vercelu ne objavlja (`vercel.json` → `git.deploymentEnabled: false`) – VMS teče samo v Dockerju.
-4. Zaženite `zagon.bat` (ali `docker compose --profile tunel up -d --build`). Odprite https://vms.visionone.si.
-
-Priporočila: vklopite **dvofaktorsko prijavo** za vse uporabnike (Admin → Sistem → Moj račun). Za dodatno zaščito lahko v Cloudflare Zero Trust dodate še **Access** pravilo (npr. potrditev po e-pošti).
-
-Omejitve od zunaj: živa slika gre prek MSE (WebSocket), ki skozi tunel deluje. **Dvosmerni zvok** potrebuje WebRTC (UDP) in deluje le v lokalnem omrežju.
-
-## 7. ESP32 programator (View → ESP32)
-
-Nalaganje firmwara na ESP32 neposredno iz brskalnika (Web Serial, knjižnica esptool-js). Plošča je priklopljena na USB **računalnika, na katerem je odprt View** – ne na strežnik.
-
-- deluje v **Chrome ali Edge** na računalniku, prek HTTPS (vms.visionone.si) ali na localhost
-- prepozna čip (ESP32, S2, S3, C3, C6 …), nalaganje ene datoteke (merged) ali več datotek na naslove (bootloader, partitions, boot_app0, aplikacija)
-- brisanje flasha, ponastavitev plošče, serijski monitor
-- če se povezava ne vzpostavi, med povezovanjem držite tipko BOOT; za CP210x/CH340 namestite gonilnik
+Osebje prejema vsa obvestila; stranka le svoja. Vsak ukaz prek Telegrama se beleži.
 
 ---
 
-## 8. Varnost
+## 3. Agent pri stranki
 
-- VMS-a **ne odpirajte neposredno v internet** (posredovanje vrat). Za oddaljen dostop uporabite priloženi Cloudflare Tunnel (poglavje 6) ali VPN.
-- HTTPS je potreben tudi za mikrofon v brskalniku (dvosmerni zvok).
-- Revizijska sled beleži prijave, predvajanja, izvoze in spremembe nastavitev.
+Podroben opis: [`agent/README.md`](agent/README.md). Na kratko:
 
-## 9. Varnostne kopije
+**Windows (storitev):**
+1. Skopiraj `visionone-agent.exe` in `config.json` (iz `config.example.json`) v mapo, npr. `C:\VisionOne`.
+2. V `config.json` vpiši `portal_url` in `token` (žeton lokacije iz portala).
+3. Kot **Administrator**: `visionone-agent.exe install` → teče kot storitev `VisionOneAgent`.
 
-- `data/vms` – nastavitve VMS, dogodki, sličice, izvozi (ali Admin → Sistem → Prenesi kopijo)
-- mapa posnetkov – po potrebi
-
-## 10. Omejitve in kaj preveriti
-
-- **Kodeki v brskalniku**: H.264 deluje povsod. H.265 (HEVC) predvajajo Chrome, Edge in Safari na novejši strojni opremi; za starejše računalnike nastavite podtok kamere na H.264.
-- **Predvajanje s snemalnika Hikvision** uporablja lokalni čas snemalnika; strežnik in snemalnik naj imata isti časovni pas (NTP).
-- Prepoznava registrskih tablic še ni vključena.
-- Maske zasebnosti delujejo v živi sliki View, ne pa v posnetkih in izvozih.
-
-## Zgradba
-
+**Linux / NAS (Docker):**
 ```
-visionone/
-├── docker-compose.yml      vse storitve
-├── .env.example            nastavitve
-├── go2rtc/go2rtc.yaml      pretočni strežnik (živa slika, RTSP restream)
-├── vms/                    VisionOne strežnik + Admin + View (Node.js, brez zunanjih knjižnic)
-│   ├── src/                API, ONVIF, snemalniki, snemanje, dogodki, pravila, MQTT
-│   └── web/                admin/, view/ (vključno z ESP32 programatorjem), common/
-└── ai/                     VisionOne AI (Python, YOLO, OpenCV)
+cd agent
+VO_TOKEN=<žeton-lokacije> docker compose up -d --build
 ```
 
-Uporabljeni odprtokodni projekti: [go2rtc](https://github.com/AlexxIT/go2rtc) (MIT), [Ultralytics YOLO](https://github.com/ultralytics/ultralytics) (AGPL-3.0 – za komercialno prodajo VisionOne preverite licenčne pogoje ali uporabite drug model), [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) (MIT), [esptool-js](https://github.com/espressif/esptool-js) (Apache-2.0, naloži se iz CDN), [cloudflared](https://github.com/cloudflare/cloudflared) (Apache-2.0), FFmpeg (LGPL/GPL).
+Agent spremlja ping/vrata, kamere in snemalnike (ONVIF/ISAPI), omrežno opremo
+(SNMP), strežnik in Docker; zazna nove naprave v omrežju; izvaja dovoljene
+daljinske ukaze.
+
+---
+
+## 4. Uporaba portala
+
+- **Stranke → Lokacije → Naprave.** Vsaka lokacija dobi svoj žeton agenta (prikazan enkrat; lahko ga zavrtiš).
+- **Nadzorna plošča:** stanje lokacij/naprav, odprti izpadi, licence.
+- **Licence:** paketi Basic / Pro / Enterprise (letno). Ob izdaji dobiš podpisano
+  datoteko (Ed25519), ki jo pošlješ stranki; agent jo preveri. Opomniki pred potekom
+  gredo po Telegramu.
+- **Daljinski ukazi:** gumb na napravi (domofon/rele) ali prek Telegrama. Agent
+  izvede **samo lokalno dovoljena dejanja** (definirana v `config.json`).
+- **Uporabniki:** vloge skrbnik / tehnik / stranka (stranka vidi le svoje).
+- **Dnevnik:** vsa dejanja (prijave, ukazi, spremembe).
+
+---
+
+## 5. Varnost
+
+- Agent se povezuje **navzven** (HTTPS/WSS) — pri stranki ni odprtih vrat.
+- Gesla naprav lahko ostanejo **lokalno v agentu** (portal jih ne vidi) ali se
+  shranijo v portal **šifrirana** (AES-256-GCM, ključ `DEVICE_SECRET_KEY` izven baze).
+- Portalna gesla: scrypt. Seje v bazi (preklicljive), piškotki HttpOnly+Secure.
+- 2FA (TOTP), omejevanje poskusov prijave, zaklep računa.
+- Ločevanje med strankami se preverja pri **vsaki** poizvedbi.
+- Žetoni agentov so v bazi shranjeni le kot sha256; licence podpisane z Ed25519
+  (ponarejanje ni mogoče).
+- Stroge varnostne HTTP glave in CSP (`vercel.json`).
+- Daljinski ukazi: agent sme sprožiti le vnaprej določena dejanja; vse se beleži.
+
+> Opozorilo: odpiranje vrat/relejev na daljavo je občutljivo. Dejanja omeji na
+> nujna, uporabljaj močna gesla naprav in 2FA za račune.
+
+---
+
+## 6. Razvoj in testi
+
+```
+npm install
+npm test          # testi avtentikacije, licenc, agent API
+```
+Struktura:
+- `api/` — Vercel funkcije (REST), `api/agent/*` za agenta, `api/cron/*` za nadzor.
+- `lib/` — baza, avtentikacija, kripto, TOTP, licence, Telegram.
+- `public/` — spletni vmesnik (vanilla JS).
+- `agent/` — Go agent (Windows storitev + Docker).

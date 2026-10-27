@@ -1,5 +1,12 @@
-.env
-data/
-recordings/
-*.log
 node_modules/
+.env
+.env.local
+.vercel
+*.log
+agent/bin/
+agent/dist/
+data/
+keys/
+*.pem
+coverage/
+.DS_Store
